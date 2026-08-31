@@ -4,16 +4,15 @@ import { useAppDispatch, useAppSelector } from './store';
 import { movePlayer, moveTargetCursor, castScroll, cancelTargeting, resetGame, getPlayerStats } from './store/gameSlice';
 import { InventoryModal } from './components/InventoryModal';
 
-// Helper to apply Dracula Theme colors based on log content
 const getLogColor = (log: string) => {
   const lowerLog = log.toLowerCase();
-  if (lowerLog.includes('damage') || lowerLog.includes('hits you') || lowerLog.includes('suffers')) return '#ff5555'; // Dracula Red
-  if (lowerLog.includes('defeated')) return '#ff79c6'; // Dracula Pink
-  if (lowerLog.includes('restored') || lowerLog.includes('picked up')) return '#50fa7b'; // Dracula Green
-  if (lowerLog.includes('equipped') || lowerLog.includes('dropped')) return '#8be9fd'; // Dracula Cyan
-  if (lowerLog.includes('cast') || lowerLog.includes('targeting') || lowerLog.includes('confused')) return '#bd93f9'; // Dracula Purple
-  if (lowerLog.includes('descend') || lowerLog.includes('inventory full')) return '#f1fa8c'; // Dracula Yellow
-  return '#f8f8f2'; // Brighter Dracula Foreground (makes Welcome messages pop cleanly)
+  if (lowerLog.includes('damage') || lowerLog.includes('hits you') || lowerLog.includes('suffers')) return '#ff5555'; 
+  if (lowerLog.includes('defeated')) return '#ff79c6'; 
+  if (lowerLog.includes('restored') || lowerLog.includes('picked up')) return '#50fa7b'; 
+  if (lowerLog.includes('equipped') || lowerLog.includes('dropped')) return '#8be9fd'; 
+  if (lowerLog.includes('cast') || lowerLog.includes('targeting') || lowerLog.includes('confused')) return '#bd93f9'; 
+  if (lowerLog.includes('descend') || lowerLog.includes('inventory full')) return '#f1fa8c'; 
+  return '#f8f8f2'; 
 };
 
 export default function App() {
@@ -28,7 +27,6 @@ export default function App() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // 1. Handling Targeting Mode
       if (targeting.active) {
         switch (e.key) {
           case 'ArrowUp': case 'w': case 'W': dispatch(moveTargetCursor({ dx: 0, dy: -1 })); break;
@@ -41,7 +39,6 @@ export default function App() {
         return;
       }
 
-      // 2. Handling Modal Toggle
       if (e.key === 'i' || e.key === 'I') {
         setInventoryOpen((prev) => !prev);
         return;
@@ -52,10 +49,8 @@ export default function App() {
         return;
       }
 
-      // Block normal movement if dead or inventory is open
       if (isDead || inventoryOpen) return;
 
-      // 3. Normal Player Movement
       switch (e.key) {
         case 'ArrowUp': case 'w': case 'W': dispatch(movePlayer({ dx: 0, dy: -1 })); break;
         case 'ArrowDown': case 's': case 'S': dispatch(movePlayer({ dx: 0, dy: 1 })); break;
@@ -72,7 +67,6 @@ export default function App() {
   }, [handleKeyDown]);
 
   const renderCell = (x: number, y: number) => {
-    // Render Targeting Cursor and AoE Blast Radius
     if (targeting.active) {
       if (targeting.cursor.x === x && targeting.cursor.y === y) {
         return <span style={{ color: '#ff3838', fontWeight: 'bold', backgroundColor: '#4b1e1e' }}>X</span>;
@@ -86,10 +80,8 @@ export default function App() {
     const isExplored = explored[y]?.[x];
     const isVisible = visible[y]?.[x];
 
-    // If completely unexplored, render blank space
     if (!isExplored) return ' ';
 
-    // Direct Line of Sight (Fully Lit)
     if (isVisible) {
       if (player.position.x === x && player.position.y === y) {
         return <span style={{ color: player.color, fontWeight: 'bold' }}>{player.char}</span>;
@@ -98,7 +90,6 @@ export default function App() {
       const monster = monsters.find((m) => m.position.x === x && m.position.y === y);
       if (monster) {
         let monsterColor = monster.color;
-        // Adjust monster color if afflicted by a status
         if (monster.statuses.some((s) => s.type === 'FROZEN')) monsterColor = '#74b9ff';
         if (monster.statuses.some((s) => s.type === 'BURNING')) monsterColor = '#ff7675';
         if (monster.statuses.some((s) => s.type === 'CONFUSED')) monsterColor = '#a29bfe';
@@ -111,7 +102,6 @@ export default function App() {
       }
     }
 
-    // Explored but currently out of FOV (Dimmed terrain geometry)
     const tile = grid[y][x];
     const wallColor = isVisible ? '#8b949e' : '#30363d';
     const floorColor = isVisible ? '#484f58' : '#21262d';
@@ -128,7 +118,6 @@ export default function App() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, bgcolor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
-      {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#58a6ff' }}>
           ROGUE CLONE — LEVEL {dungeonLevel}
@@ -145,7 +134,6 @@ export default function App() {
         </Box>
       </Box>
 
-      {/* Dynamic Status / Stats Bar */}
       <Box sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
           <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
@@ -169,7 +157,6 @@ export default function App() {
         />
       </Box>
 
-      {/* ASCII Viewport */}
       <Paper
         elevation={3}
         sx={{
@@ -193,7 +180,6 @@ export default function App() {
         ))}
       </Paper>
 
-      {/* DRACULA THEMED LOG CONTAINER */}
       <Paper sx={{ mt: 2, p: 2, bgcolor: '#282a36', border: '1px solid #44475a' }}>
         <Typography variant="subtitle2" sx={{ color: '#bd93f9', fontFamily: 'monospace', mb: 1, fontWeight: 'bold' }}>
           Action Log:
@@ -208,7 +194,7 @@ export default function App() {
                 sx={{ 
                   fontFamily: 'monospace', 
                   fontSize: '14px', 
-                  color: getLogColor(log), // Forced via sx prop ensuring valid hex code rendering
+                  color: getLogColor(log),
                   fontWeight: '500' 
                 }}
               >
@@ -219,7 +205,6 @@ export default function App() {
         </List>
       </Paper>
 
-      {/* Inventory & Equipment Modal */}
       <InventoryModal open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
     </Container>
   );

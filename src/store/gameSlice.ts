@@ -1,4 +1,5 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 import type { GameState, Position, ActiveStatus, Entity } from '../types/game';
 import { generateDungeon, MAP_WIDTH, MAP_HEIGHT } from '../utils/bspGenerator';
 import { computeFOV, updateExploredMap } from '../utils/fov';
@@ -75,6 +76,8 @@ const createInitialState = (): GameState => {
       maxHp: 40,
       baseAttack: 6,
       baseDefense: 1,
+      attack: 6,
+      defense: 1,
       statuses: [],
       inventory: [
         {

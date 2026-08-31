@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box,
-  Typography, Grid, Card, CardContent, CardActions, Chip, Divider,
+  Typography, Card, CardContent, CardActions, Chip, Divider,
 } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../store';
 import { useItem, equipItem, unequipItem, dropItem, startTargeting } from '../store/gameSlice';
@@ -41,8 +41,8 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({ open, onClose })
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: { bgcolor: '#161b22', color: '#c9d1d9', border: '1px solid #30363d', fontFamily: 'monospace' },
+      slotProps={{
+        paper: { sx: { bgcolor: '#161b22', color: '#c9d1d9', border: '1px solid #30363d', fontFamily: 'monospace' } }
       }}
     >
       <DialogTitle sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#58a6ff' }}>
@@ -96,9 +96,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({ open, onClose })
         {player.inventory.length === 0 ? (
           <Typography variant="body2" sx={{ color: '#6e7681', fontStyle: 'italic', fontFamily: 'monospace', py: 2 }}>Backpack is empty.</Typography>
         ) : (
-          <Grid container spacing={2}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
             {player.inventory.map((item) => (
-              <Grid item xs={12} sm={6} key={item.id}>
+              <Box key={item.id}>
                 <Card sx={{ bgcolor: '#0d1117', border: '1px solid #30363d' }}>
                   <CardContent sx={{ pb: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -114,9 +114,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({ open, onClose })
                     </Button>
                   </CardActions>
                 </Card>
-              </Grid>
+              </Box>
             ))}
-          </Grid>
+          </Box>
         )}
       </DialogContent>
 
