@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { GameState, Position, ActiveStatus, Entity } from '../types/game';
+import type { GameState, Position, ActiveStatus, Entity, GraphicsMode } from '../types/game';
 import { generateDungeon, MAP_WIDTH, MAP_HEIGHT } from '../utils/bspGenerator';
 import { computeFOV, updateExploredMap } from '../utils/fov';
 import { findNextStepAStar } from '../utils/pathfinding';
@@ -59,6 +59,8 @@ const createInitialState = (): GameState => {
   updateExploredMap(explored, visible);
 
   return {
+    screen: 'TITLE',
+    graphicsMode: 'ASCII',
     dungeonLevel: 1,
     mapWidth: MAP_WIDTH,
     mapHeight: MAP_HEIGHT,
@@ -171,6 +173,16 @@ export const gameSlice = createSlice({
   name: 'game',
   initialState: createInitialState(),
   reducers: {
+    showMenu: (state) => {
+      state.screen = 'MENU';
+    },
+    startGame: (state, action: PayloadAction<GraphicsMode>) => {
+      state.screen = 'GAME';
+      state.graphicsMode = action.payload;
+    },
+    returnToTitle: (state) => {
+      state.screen = 'TITLE';
+    },
     movePlayer: (state, action: PayloadAction<{ dx: number; dy: number }>) => {
       if (state.targeting.active) return;
 
@@ -383,6 +395,7 @@ export const gameSlice = createSlice({
 export const {
   movePlayer, startTargeting, moveTargetCursor, cancelTargeting, castScroll,
   useItem, equipItem, unequipItem, dropItem, resetGame,
+  showMenu, startGame, returnToTitle
 } = gameSlice.actions;
 
 export default gameSlice.reducer;

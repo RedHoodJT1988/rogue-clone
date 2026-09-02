@@ -1,3 +1,6 @@
+export type ScreenState = 'TITLE' | 'MENU' | 'GAME';
+export type GraphicsMode = 'ASCII' | '1BIT';
+
 export type TileType = 'WALL' | 'FLOOR' | 'DOOR' | 'CORRIDOR' | 'STAIRS_DOWN';
 
 export interface Position {
@@ -71,6 +74,8 @@ export interface TargetingState {
 }
 
 export interface GameState {
+  screen: ScreenState;
+  graphicsMode: GraphicsMode;
   dungeonLevel: number;
   mapWidth: number;
   mapHeight: number;

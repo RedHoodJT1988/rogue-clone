@@ -1,9 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Container, Paper, List, ListItem, LinearProgress, Button, Chip } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store';
-import { movePlayer, moveTargetCursor, castScroll, cancelTargeting, resetGame, getPlayerStats } from './store/gameSlice';
+import { 
+  movePlayer, moveTargetCursor, castScroll, cancelTargeting, resetGame, getPlayerStats,
+  showMenu, startGame 
+} from './store/gameSlice';
 import { InventoryModal } from './components/InventoryModal';
+import { TILE_SPRITES, ITEM_SPRITES, ENTITY_SPRITES, getSpriteStyle } from './utils/sprites';
 
+// Google Font injection for Title Screen
+const fontLink = document.createElement('link');
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+fontLink.rel = 'stylesheet';
+document.head.appendChild(fontLink);
+
+// Helper to apply Dracula Theme colors based on log content
 const getLogColor = (log: string) => {
   const lowerLog = log.toLowerCase();
   if (lowerLog.includes('damage') || lowerLog.includes('hits you') || lowerLog.includes('suffers')) return '#ff5555'; 
@@ -18,15 +29,24 @@ const getLogColor = (log: string) => {
 export default function App() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const dispatch = useAppDispatch();
-  const { dungeonLevel, grid, explored, visible, player, monsters, items, logs, targeting } = useAppSelector(
-    (state) => state.game
-  );
+  const { 
+    screen, graphicsMode, dungeonLevel, grid, explored, visible, 
+    player, monsters, items, logs, targeting 
+  } = useAppSelector((state) => state.game);
 
   const isDead = player.hp <= 0;
   const { totalAttack, totalDefense } = getPlayerStats(player);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Screen Transitions
+      if (screen === 'TITLE') {
+        if (e.key === 'Enter') dispatch(showMenu());
+        return;
+      }
+      if (screen === 'MENU') return; // Handled by button clicks
+
+      // Targeting Mode
       if (targeting.active) {
         switch (e.key) {
           case 'ArrowUp': case 'w': case 'W': dispatch(moveTargetCursor({ dx: 0, dy: -1 })); break;
@@ -39,11 +59,11 @@ export default function App() {
         return;
       }
 
+      // Inventory Toggle
       if (e.key === 'i' || e.key === 'I') {
         setInventoryOpen((prev) => !prev);
         return;
       }
-
       if (e.key === 'Escape' && inventoryOpen) {
         setInventoryOpen(false);
         return;
@@ -51,6 +71,7 @@ export default function App() {
 
       if (isDead || inventoryOpen) return;
 
+      // Normal Player Movement
       switch (e.key) {
         case 'ArrowUp': case 'w': case 'W': dispatch(movePlayer({ dx: 0, dy: -1 })); break;
         case 'ArrowDown': case 's': case 'S': dispatch(movePlayer({ dx: 0, dy: 1 })); break;
@@ -58,7 +79,7 @@ export default function App() {
         case 'ArrowRight': case 'd': case 'D': dispatch(movePlayer({ dx: 1, dy: 0 })); break;
       }
     },
-    [dispatch, isDead, inventoryOpen, targeting.active]
+    [dispatch, screen, isDead, inventoryOpen, targeting.active]
   );
 
   useEffect(() => {
@@ -67,6 +88,7 @@ export default function App() {
   }, [handleKeyDown]);
 
   const renderCell = (x: number, y: number) => {
+    // 1. Targeting Overlays (Always standard chars)
     if (targeting.active) {
       if (targeting.cursor.x === x && targeting.cursor.y === y) {
         return <span style={{ color: '#ff3838', fontWeight: 'bold', backgroundColor: '#4b1e1e' }}>X</span>;
@@ -80,11 +102,14 @@ export default function App() {
     const isExplored = explored[y]?.[x];
     const isVisible = visible[y]?.[x];
 
-    if (!isExplored) return ' ';
+    if (!isExplored) return graphicsMode === '1BIT' ? <span style={{ display: 'inline-block', width: 16, height: 16 }} /> : ' ';
 
+    // 2. Direct Line of Sight Entities
     if (isVisible) {
       if (player.position.x === x && player.position.y === y) {
-        return <span style={{ color: player.color, fontWeight: 'bold' }}>{player.char}</span>;
+        return graphicsMode === '1BIT' 
+          ? <div style={getSpriteStyle(ENTITY_SPRITES['@'], player.color)} />
+          : <span style={{ color: player.color, fontWeight: 'bold' }}>{player.char}</span>;
       }
 
       const monster = monsters.find((m) => m.position.x === x && m.position.y === y);
@@ -93,20 +118,32 @@ export default function App() {
         if (monster.statuses.some((s) => s.type === 'FROZEN')) monsterColor = '#74b9ff';
         if (monster.statuses.some((s) => s.type === 'BURNING')) monsterColor = '#ff7675';
         if (monster.statuses.some((s) => s.type === 'CONFUSED')) monsterColor = '#a29bfe';
-        return <span style={{ color: monsterColor, fontWeight: 'bold' }}>{monster.char}</span>;
+        
+        return graphicsMode === '1BIT'
+          ? <div style={getSpriteStyle(ENTITY_SPRITES[monster.char] || ENTITY_SPRITES['H'], monsterColor)} />
+          : <span style={{ color: monsterColor, fontWeight: 'bold' }}>{monster.char}</span>;
       }
 
       const item = items.find((i) => i.position?.x === x && i.position?.y === y);
       if (item) {
-        return <span style={{ color: item.color, fontWeight: 'bold' }}>{item.char}</span>;
+        return graphicsMode === '1BIT'
+          ? <div style={getSpriteStyle(ITEM_SPRITES[item.type], item.color)} />
+          : <span style={{ color: item.color, fontWeight: 'bold' }}>{item.char}</span>;
       }
     }
 
+    // 3. Terrain Mapping
     const tile = grid[y][x];
     const wallColor = isVisible ? '#8b949e' : '#30363d';
     const floorColor = isVisible ? '#484f58' : '#21262d';
     const stairsColor = isVisible ? '#51cf66' : '#238636';
 
+    if (graphicsMode === '1BIT') {
+      const tileColor = tile === 'WALL' || tile === 'CORRIDOR' ? wallColor : tile === 'STAIRS_DOWN' ? stairsColor : floorColor;
+      return <div style={getSpriteStyle(TILE_SPRITES[tile], tileColor)} />;
+    }
+
+    // Fallback to ASCII
     switch (tile) {
       case 'WALL': return <span style={{ color: wallColor }}>#</span>;
       case 'FLOOR': return <span style={{ color: floorColor }}>.</span>;
@@ -115,6 +152,60 @@ export default function App() {
       default: return ' ';
     }
   };
+
+  // --- UI RENDERERS ---
+
+  if (screen === 'TITLE') {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#0d1117', color: '#fff' }}>
+        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: { xs: '2rem', md: '4rem' }, color: '#58a6ff', mb: 8, textAlign: 'center', textShadow: '2px 2px 4px rgba(88,166,255,0.4)' }}>
+          DUNGEONS OF DOOM
+        </Typography>
+        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: '1rem', color: '#50fa7b', animation: 'blink 1.5s infinite' }}>
+          PRESS ENTER TO START
+        </Typography>
+        <style>
+          {`@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }`}
+        </style>
+      </Box>
+    );
+  }
+
+  if (screen === 'MENU') {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#0d1117', color: '#fff' }}>
+        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: '2rem', color: '#bd93f9', mb: 6, textAlign: 'center' }}>
+          CHOOSE YOUR STYLE
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 4, flexDirection: { xs: 'column', md: 'row' } }}>
+          <Paper 
+            onClick={() => dispatch(startGame('ASCII'))}
+            sx={{ p: 4, bgcolor: '#161b22', border: '2px solid #30363d', cursor: 'pointer', '&:hover': { borderColor: '#58a6ff', bgcolor: '#21262d' } }}
+          >
+            <Typography variant="h6" sx={{ fontFamily: 'monospace', color: '#58a6ff', mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
+              CLASSIC ASCII
+            </Typography>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#8b949e', textAlign: 'center', maxWidth: 200 }}>
+              The authentic 1980s terminal experience. Pure text, pure imagination.
+            </Typography>
+          </Paper>
+
+          <Paper 
+            onClick={() => dispatch(startGame('1BIT'))}
+            sx={{ p: 4, bgcolor: '#161b22', border: '2px solid #30363d', cursor: 'pointer', '&:hover': { borderColor: '#50fa7b', bgcolor: '#21262d' } }}
+          >
+            <Typography variant="h6" sx={{ fontFamily: 'monospace', color: '#50fa7b', mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
+              MODERN 1-BIT
+            </Typography>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#8b949e', textAlign: 'center', maxWidth: 200 }}>
+              Pixel-perfect graphical tiles powered by the Kenney.nl asset pack.
+            </Typography>
+          </Paper>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, bgcolor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
@@ -128,7 +219,7 @@ export default function App() {
           </Button>
           {isDead && (
             <Button variant="contained" color="error" onClick={() => dispatch(resetGame())}>
-              Respawn
+              Title Screen
             </Button>
           )}
         </Box>
@@ -164,15 +255,15 @@ export default function App() {
           bgcolor: '#000', 
           fontFamily: '"Courier New", Courier, monospace', 
           fontSize: '15px',
-          lineHeight: '15px', 
-          letterSpacing: '3px', 
+          lineHeight: graphicsMode === '1BIT' ? '0' : '15px',
+          letterSpacing: graphicsMode === '1BIT' ? '0' : '3px', 
           overflowX: 'auto', 
           userSelect: 'none',
           border: targeting.active ? '1px solid #d63031' : '1px solid #30363d',
         }}
       >
         {grid.map((row, y) => (
-          <div key={y} style={{ whiteSpace: 'pre' }}>
+          <div key={y} style={{ whiteSpace: 'pre', height: graphicsMode === '1BIT' ? '16px' : 'auto' }}>
             {row.map((_, x) => (
               <React.Fragment key={`${x}-${y}`}>{renderCell(x, y)}</React.Fragment>
             ))}
