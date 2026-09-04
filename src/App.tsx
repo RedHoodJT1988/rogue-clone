@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Container, Paper, List, ListItem, LinearProgress, Button, Chip, IconButton } from '@mui/material';
+import { Box, Typography, Container, Paper, List, ListItem, LinearProgress, Button, Chip } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store';
 import { 
   movePlayer, moveTargetCursor, castScroll, cancelTargeting, resetGame, getPlayerStats,
