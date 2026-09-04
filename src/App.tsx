@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Container, Paper, List, ListItem, LinearProgress, Button, Chip } from '@mui/material';
+import { Box, Typography, Container, Paper, List, ListItem, LinearProgress, Button, Chip, IconButton } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store';
 import { 
   movePlayer, moveTargetCursor, castScroll, cancelTargeting, resetGame, getPlayerStats,
@@ -37,31 +37,47 @@ export default function App() {
   const isDead = player.hp <= 0;
   const { totalAttack, totalDefense } = getPlayerStats(player);
 
+  // --- REUSABLE CONTROL LOGIC (Works for Keyboard AND Touch) ---
+  const handleDirectionInput = useCallback((dx: number, dy: number) => {
+    if (isDead || inventoryOpen) return;
+    if (targeting.active) {
+      dispatch(moveTargetCursor({ dx, dy }));
+    } else {
+      dispatch(movePlayer({ dx, dy }));
+    }
+  }, [dispatch, isDead, inventoryOpen, targeting.active]);
+
+  const handleActionInput = useCallback((action: 'INVENTORY' | 'CAST' | 'CANCEL') => {
+    if (isDead) return;
+    if (action === 'INVENTORY') setInventoryOpen((prev) => !prev);
+    if (action === 'CAST') dispatch(castScroll());
+    if (action === 'CANCEL') dispatch(cancelTargeting());
+  }, [dispatch, isDead]);
+
+
+  // --- KEYBOARD LISTENER ---
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Screen Transitions
       if (screen === 'TITLE') {
         if (e.key === 'Enter') dispatch(showMenu());
         return;
       }
-      if (screen === 'MENU') return; // Handled by button clicks
+      if (screen === 'MENU') return; 
 
-      // Targeting Mode
       if (targeting.active) {
         switch (e.key) {
-          case 'ArrowUp': case 'w': case 'W': dispatch(moveTargetCursor({ dx: 0, dy: -1 })); break;
-          case 'ArrowDown': case 's': case 'S': dispatch(moveTargetCursor({ dx: 0, dy: 1 })); break;
-          case 'ArrowLeft': case 'a': case 'A': dispatch(moveTargetCursor({ dx: -1, dy: 0 })); break;
-          case 'ArrowRight': case 'd': case 'D': dispatch(moveTargetCursor({ dx: 1, dy: 0 })); break;
-          case 'Enter': dispatch(castScroll()); break;
-          case 'Escape': dispatch(cancelTargeting()); break;
+          case 'ArrowUp': case 'w': case 'W': handleDirectionInput(0, -1); break;
+          case 'ArrowDown': case 's': case 'S': handleDirectionInput(0, 1); break;
+          case 'ArrowLeft': case 'a': case 'A': handleDirectionInput(-1, 0); break;
+          case 'ArrowRight': case 'd': case 'D': handleDirectionInput(1, 0); break;
+          case 'Enter': handleActionInput('CAST'); break;
+          case 'Escape': handleActionInput('CANCEL'); break;
         }
         return;
       }
 
-      // Inventory Toggle
       if (e.key === 'i' || e.key === 'I') {
-        setInventoryOpen((prev) => !prev);
+        handleActionInput('INVENTORY');
         return;
       }
       if (e.key === 'Escape' && inventoryOpen) {
@@ -71,15 +87,14 @@ export default function App() {
 
       if (isDead || inventoryOpen) return;
 
-      // Normal Player Movement
       switch (e.key) {
-        case 'ArrowUp': case 'w': case 'W': dispatch(movePlayer({ dx: 0, dy: -1 })); break;
-        case 'ArrowDown': case 's': case 'S': dispatch(movePlayer({ dx: 0, dy: 1 })); break;
-        case 'ArrowLeft': case 'a': case 'A': dispatch(movePlayer({ dx: -1, dy: 0 })); break;
-        case 'ArrowRight': case 'd': case 'D': dispatch(movePlayer({ dx: 1, dy: 0 })); break;
+        case 'ArrowUp': case 'w': case 'W': handleDirectionInput(0, -1); break;
+        case 'ArrowDown': case 's': case 'S': handleDirectionInput(0, 1); break;
+        case 'ArrowLeft': case 'a': case 'A': handleDirectionInput(-1, 0); break;
+        case 'ArrowRight': case 'd': case 'D': handleDirectionInput(1, 0); break;
       }
     },
-    [dispatch, screen, isDead, inventoryOpen, targeting.active]
+    [screen, dispatch, isDead, inventoryOpen, targeting.active, handleDirectionInput, handleActionInput]
   );
 
   useEffect(() => {
@@ -88,7 +103,6 @@ export default function App() {
   }, [handleKeyDown]);
 
   const renderCell = (x: number, y: number) => {
-    // 1. Targeting Overlays (Always standard chars)
     if (targeting.active) {
       if (targeting.cursor.x === x && targeting.cursor.y === y) {
         return <span style={{ color: '#ff3838', fontWeight: 'bold', backgroundColor: '#4b1e1e' }}>X</span>;
@@ -104,7 +118,6 @@ export default function App() {
 
     if (!isExplored) return graphicsMode === '1BIT' ? <span style={{ display: 'inline-block', width: 16, height: 16 }} /> : ' ';
 
-    // 2. Direct Line of Sight Entities
     if (isVisible) {
       if (player.position.x === x && player.position.y === y) {
         return graphicsMode === '1BIT' 
@@ -132,7 +145,6 @@ export default function App() {
       }
     }
 
-    // 3. Terrain Mapping
     const tile = grid[y][x];
     const wallColor = isVisible ? '#8b949e' : '#30363d';
     const floorColor = isVisible ? '#484f58' : '#21262d';
@@ -143,7 +155,6 @@ export default function App() {
       return <div style={getSpriteStyle(TILE_SPRITES[tile], tileColor)} />;
     }
 
-    // Fallback to ASCII
     switch (tile) {
       case 'WALL': return <span style={{ color: wallColor }}>#</span>;
       case 'FLOOR': return <span style={{ color: floorColor }}>.</span>;
@@ -153,17 +164,18 @@ export default function App() {
     }
   };
 
-  // --- UI RENDERERS ---
 
+  // --- UI SCREENS ---
   if (screen === 'TITLE') {
     return (
-      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#0d1117', color: '#fff' }}>
-        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: { xs: '2rem', md: '4rem' }, color: '#58a6ff', mb: 8, textAlign: 'center', textShadow: '2px 2px 4px rgba(88,166,255,0.4)' }}>
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#0d1117', color: '#fff', px: 2 }}>
+        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: { xs: '1.5rem', md: '4rem' }, color: '#58a6ff', mb: 8, textAlign: 'center', textShadow: '2px 2px 4px rgba(88,166,255,0.4)' }}>
           DUNGEONS OF DOOM
         </Typography>
-        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: '1rem', color: '#50fa7b', animation: 'blink 1.5s infinite' }}>
-          PRESS ENTER TO START
+        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: { xs: '0.8rem', md: '1rem' }, color: '#50fa7b', animation: 'blink 1.5s infinite', textAlign: 'center' }}>
+          PRESS ENTER (OR TAP) TO START
         </Typography>
+        <Box onClick={() => dispatch(showMenu())} sx={{ position: 'absolute', inset: 0, cursor: 'pointer' }} />
         <style>
           {`@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }`}
         </style>
@@ -173,31 +185,19 @@ export default function App() {
 
   if (screen === 'MENU') {
     return (
-      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#0d1117', color: '#fff' }}>
-        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: '2rem', color: '#bd93f9', mb: 6, textAlign: 'center' }}>
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#0d1117', color: '#fff', px: 2 }}>
+        <Typography sx={{ fontFamily: '"Press Start 2P", monospace', fontSize: { xs: '1.2rem', md: '2rem' }, color: '#bd93f9', mb: 6, textAlign: 'center' }}>
           CHOOSE YOUR STYLE
         </Typography>
-        
         <Box sx={{ display: 'flex', gap: 4, flexDirection: { xs: 'column', md: 'row' } }}>
-          <Paper 
-            onClick={() => dispatch(startGame('ASCII'))}
-            sx={{ p: 4, bgcolor: '#161b22', border: '2px solid #30363d', cursor: 'pointer', '&:hover': { borderColor: '#58a6ff', bgcolor: '#21262d' } }}
-          >
-            <Typography variant="h6" sx={{ fontFamily: 'monospace', color: '#58a6ff', mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
-              CLASSIC ASCII
-            </Typography>
+          <Paper onClick={() => dispatch(startGame('ASCII'))} sx={{ p: 4, bgcolor: '#161b22', border: '2px solid #30363d', cursor: 'pointer', '&:hover': { borderColor: '#58a6ff', bgcolor: '#21262d' } }}>
+            <Typography variant="h6" sx={{ fontFamily: 'monospace', color: '#58a6ff', mb: 2, textAlign: 'center', fontWeight: 'bold' }}>CLASSIC ASCII</Typography>
             <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#8b949e', textAlign: 'center', maxWidth: 200 }}>
               The authentic 1980s terminal experience. Pure text, pure imagination.
             </Typography>
           </Paper>
-
-          <Paper 
-            onClick={() => dispatch(startGame('1BIT'))}
-            sx={{ p: 4, bgcolor: '#161b22', border: '2px solid #30363d', cursor: 'pointer', '&:hover': { borderColor: '#50fa7b', bgcolor: '#21262d' } }}
-          >
-            <Typography variant="h6" sx={{ fontFamily: 'monospace', color: '#50fa7b', mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
-              MODERN 1-BIT
-            </Typography>
+          <Paper onClick={() => dispatch(startGame('1BIT'))} sx={{ p: 4, bgcolor: '#161b22', border: '2px solid #30363d', cursor: 'pointer', '&:hover': { borderColor: '#50fa7b', bgcolor: '#21262d' } }}>
+            <Typography variant="h6" sx={{ fontFamily: 'monospace', color: '#50fa7b', mb: 2, textAlign: 'center', fontWeight: 'bold' }}>MODERN 1-BIT</Typography>
             <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#8b949e', textAlign: 'center', maxWidth: 200 }}>
               Pixel-perfect graphical tiles powered by the Kenney.nl asset pack.
             </Typography>
@@ -208,46 +208,45 @@ export default function App() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, bgcolor: '#0d1117', minHeight: '100vh', color: '#c9d1d9' }}>
+    <Container maxWidth="lg" sx={{ py: 2, bgcolor: '#0d1117', minHeight: '100vh', color: '#c9d1d9', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* Top HUD */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#58a6ff' }}>
-          ROGUE CLONE — LEVEL {dungeonLevel}
+        <Typography variant="h6" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#58a6ff' }}>
+          Lvl {dungeonLevel}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="primary" onClick={() => setInventoryOpen(true)} disabled={targeting.active}>
-            Inventory [I] ({player.inventory.length}/12)
-          </Button>
           {isDead && (
-            <Button variant="contained" color="error" onClick={() => dispatch(resetGame())}>
-              Title Screen
+            <Button variant="contained" color="error" size="small" onClick={() => dispatch(resetGame())}>
+              Respawn
             </Button>
           )}
         </Box>
       </Box>
 
+      {/* Stats Bar */}
       <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
           <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-            HP: {player.hp} / {player.maxHp}
+            HP: {player.hp}/{player.maxHp}
           </Typography>
-          <Chip label={`ATK: ${totalAttack} (${player.baseAttack} + ${player.equipment.weapon?.value || 0})`} size="small" sx={{ bgcolor: '#21262d', color: '#70a1ff' }} />
-          <Chip label={`DEF: ${totalDefense} (${player.baseDefense} + ${player.equipment.armor?.value || 0})`} size="small" sx={{ bgcolor: '#21262d', color: '#eccc68' }} />
-          
+          <Chip label={`ATK: ${totalAttack}`} size="small" sx={{ bgcolor: '#21262d', color: '#70a1ff', fontSize: '0.75rem' }} />
+          <Chip label={`DEF: ${totalDefense}`} size="small" sx={{ bgcolor: '#21262d', color: '#eccc68', fontSize: '0.75rem' }} />
           {player.statuses.map((s, idx) => (
-            <Chip key={idx} label={`${s.type} (${s.duration}t)`} size="small" color={s.type === 'BURNING' ? 'error' : 'info'} />
+            <Chip key={idx} label={`${s.type}`} size="small" color={s.type === 'BURNING' ? 'error' : 'info'} sx={{ fontSize: '0.75rem' }}/>
           ))}
-
           {targeting.active && (
-            <Chip label="TARGETING MODE: [ENTER] CAST | [ESC] CANCEL" size="small" sx={{ bgcolor: '#d63031', color: '#fff', fontWeight: 'bold' }} />
+            <Chip label="TARGETING" size="small" sx={{ bgcolor: '#d63031', color: '#fff', fontWeight: 'bold', fontSize: '0.75rem' }} />
           )}
         </Box>
         <LinearProgress
           variant="determinate"
           value={(player.hp / player.maxHp) * 100}
-          sx={{ height: 10, borderRadius: 1, bgcolor: '#21262d', '& .MuiLinearProgress-bar': { bgcolor: player.hp < 10 ? '#f85149' : '#238636' } }}
+          sx={{ height: 8, borderRadius: 1, bgcolor: '#21262d', '& .MuiLinearProgress-bar': { bgcolor: player.hp < 10 ? '#f85149' : '#238636' } }}
         />
       </Box>
 
+      {/* Viewport */}
       <Paper
         elevation={3}
         sx={{
@@ -259,7 +258,9 @@ export default function App() {
           letterSpacing: graphicsMode === '1BIT' ? '0' : '3px', 
           overflowX: 'auto', 
           userSelect: 'none',
-          border: targeting.active ? '1px solid #d63031' : '1px solid #30363d',
+          border: targeting.active ? '2px solid #d63031' : '1px solid #30363d',
+          flexGrow: 1,
+          mb: 2
         }}
       >
         {grid.map((row, y) => (
@@ -271,24 +272,47 @@ export default function App() {
         ))}
       </Paper>
 
-      <Paper sx={{ mt: 2, p: 2, bgcolor: '#282a36', border: '1px solid #44475a' }}>
-        <Typography variant="subtitle2" sx={{ color: '#bd93f9', fontFamily: 'monospace', mb: 1, fontWeight: 'bold' }}>
-          Action Log:
-        </Typography>
+      {/* MOBILE CONTROLS (Always visible on touch, hides on large screens if desired, but good to keep for mouse play too!) */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: '#161b22', borderRadius: 2, border: '1px solid #30363d', mb: 2 }}>
+        
+        {/* D-Pad */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 48px)', gap: 1 }}>
+          <Box />
+          <Button variant="contained" sx={{ minWidth: 0, height: 48, p: 0, bgcolor: '#21262d', color: '#c9d1d9' }} onClick={() => handleDirectionInput(0, -1)}>W</Button>
+          <Box />
+          <Button variant="contained" sx={{ minWidth: 0, height: 48, p: 0, bgcolor: '#21262d', color: '#c9d1d9' }} onClick={() => handleDirectionInput(-1, 0)}>A</Button>
+          <Button variant="contained" sx={{ minWidth: 0, height: 48, p: 0, bgcolor: '#21262d', color: '#c9d1d9' }} onClick={() => handleDirectionInput(0, 1)}>S</Button>
+          <Button variant="contained" sx={{ minWidth: 0, height: 48, p: 0, bgcolor: '#21262d', color: '#c9d1d9' }} onClick={() => handleDirectionInput(1, 0)}>D</Button>
+        </Box>
+
+        {/* Action Buttons */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: '100px' }}>
+          {targeting.active ? (
+            <>
+              <Button variant="contained" color="error" fullWidth onClick={() => handleActionInput('CAST')} sx={{ fontWeight: 'bold' }}>
+                CAST
+              </Button>
+              <Button variant="outlined" color="inherit" fullWidth onClick={() => handleActionInput('CANCEL')} sx={{ borderColor: '#44475a' }}>
+                CANCEL
+              </Button>
+            </>
+          ) : (
+            <Button variant="contained" fullWidth onClick={() => handleActionInput('INVENTORY')} sx={{ bgcolor: '#bd93f9', color: '#282a36', fontWeight: 'bold', height: 60, '&:hover': { bgcolor: '#ff79c6' } }}>
+              BAG ({player.inventory.length})
+            </Button>
+          )}
+        </Box>
+      </Box>
+
+      {/* Action Log */}
+      <Paper sx={{ p: 2, bgcolor: '#282a36', border: '1px solid #44475a', maxHeight: '150px', overflowY: 'auto' }}>
         <List dense disablePadding>
           {logs.map((log, idx) => (
             <ListItem key={idx} disablePadding sx={{ alignItems: 'flex-start', mb: 0.5 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '14px', color: '#6272a4', mr: 1, fontWeight: 'bold' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '13px', color: '#6272a4', mr: 1, fontWeight: 'bold' }}>
                 {'>'}
               </Typography>
-              <Typography 
-                sx={{ 
-                  fontFamily: 'monospace', 
-                  fontSize: '14px', 
-                  color: getLogColor(log),
-                  fontWeight: '500' 
-                }}
-              >
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '13px', color: getLogColor(log), fontWeight: '500' }}>
                 {log}
               </Typography>
             </ListItem>
